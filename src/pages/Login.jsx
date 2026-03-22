@@ -6,6 +6,7 @@ import * as yup from 'yup';
 import { toast } from 'react-toastify';
 import { FileCheck, Mail, Lock } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
+import api from '../services/api';
 
 const schema = yup.object({
   email: yup.string().email('Invalid email format').required('Email is required'),
@@ -17,6 +18,9 @@ const Login = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [isLoading, setIsLoading] = useState(false);
+  const [notVerified, setNotVerified] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [emailForResend, setEmailForResend] = useState('');
 
   const { register, handleSubmit, formState: { errors } } = useForm({
     resolver: yupResolver(schema)
@@ -26,13 +30,31 @@ const Login = () => {
 
   const onSubmit = async (data) => {
     setIsLoading(true);
+    setNotVerified(false);
+    setEmailForResend(data.email);
     try {
       await login(data.email, data.password);
       navigate(redirect.startsWith('/') ? redirect : `/${redirect}`);
     } catch (error) {
+      if (error.response?.data?.notVerified) {
+        setNotVerified(true);
+      }
       toast.error(error.response?.data?.message || 'Login failed');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleResend = async () => {
+    setResending(true);
+    try {
+      const { data } = await api.post('/auth/resend-verification', { email: emailForResend });
+      toast.success(data.message || 'Verification email sent!');
+      setNotVerified(false);
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to resend email');
+    } finally {
+      setResending(false);
     }
   };
 
@@ -114,6 +136,22 @@ const Login = () => {
                 {isLoading ? 'Signing in...' : 'Sign in'}
               </button>
             </div>
+
+            {notVerified && (
+              <div className="mt-4 p-4 bg-amber-50 rounded-lg border border-amber-100">
+                <p className="text-sm text-amber-800 mb-3">
+                  Your email is not verified. Please check your inbox or click below to resend the link.
+                </p>
+                <button
+                  type="button"
+                  onClick={handleResend}
+                  disabled={resending}
+                  className="text-sm font-semibold text-amber-900 border-b border-amber-900 hover:text-amber-700 disabled:opacity-50"
+                >
+                  {resending ? 'Sending...' : 'Resend verification email'}
+                </button>
+              </div>
+            )}
           </form>
         </div>
       </div>

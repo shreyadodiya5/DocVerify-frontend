@@ -2,13 +2,16 @@ import React from 'react';
 import { NavLink, Link } from 'react-router-dom';
 import { LayoutDashboard, FilePlus, Bell, Settings, LogOut, FileCheck } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
+import { isManagerUser } from '../utils/roles';
 
 const Sidebar = ({ isOpen, setIsOpen }) => {
   const { logout, user } = useAuth();
 
   const navItems = [
     { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-    { name: 'New Request', path: '/requests/new', icon: FilePlus },
+    ...(isManagerUser(user)
+      ? [{ name: 'New Request', path: '/requests/new', icon: FilePlus }]
+      : []),
     { name: 'Notifications', path: '/notifications', icon: Bell },
   ];
 
@@ -43,6 +46,9 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
             <div className="flex flex-col overflow-hidden">
               <span className="font-semibold text-sm text-slate-800 truncate">{user?.name}</span>
               <span className="text-xs text-slate-500 truncate">{user?.email}</span>
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-primary/80 mt-0.5">
+                {isManagerUser(user) ? 'Manager' : user?.role === 'client' ? 'Client' : 'Account'}
+              </span>
             </div>
           </div>
         </div>

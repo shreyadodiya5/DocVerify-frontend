@@ -40,7 +40,7 @@ const DocumentSelect = ({ selectedDocs, setSelectedDocs, onBack, onSubmit, isSub
   const handleAddCustom = () => {
     if (!customDocType.trim()) return;
     
-    const docId = customDocType.toLowerCase().replace(/\\s+/g, '_');
+    const docId = customDocType.toLowerCase().replace(/\s+/g, '_');
     
     if (selectedDocs.find(d => d.docType === docId)) {
       alert('This document is already in the list.');
@@ -72,7 +72,10 @@ const DocumentSelect = ({ selectedDocs, setSelectedDocs, onBack, onSubmit, isSub
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
       <div className="lg:col-span-2">
-        <h3 className="text-lg font-semibold text-slate-800 mb-4">Select Required Documents</h3>
+        <h3 className="text-lg font-semibold text-slate-800 mb-2">Documents to request</h3>
+        <p className="text-sm text-slate-500 mb-4">
+          Pick from the list or add any custom document name — you are not limited to presets.
+        </p>
         
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 mb-6">
           {PREDEFINED_DOCS.map(doc => {
@@ -170,7 +173,17 @@ const DocumentSelect = ({ selectedDocs, setSelectedDocs, onBack, onSubmit, isSub
               {selectedDocs.map(doc => (
                 <div key={doc.docType} className="bg-slate-50 rounded-lg p-3 border border-slate-100 group relative">
                   <div className="flex justify-between items-start mb-2">
-                    <span className="text-sm font-semibold text-slate-800 pr-5">{doc.label}</span>
+                    <input 
+                      type="text"
+                      className="text-sm font-semibold text-slate-800 pr-5 bg-transparent border-none focus:ring-0 w-full p-0"
+                      value={doc.label}
+                      onChange={(e) => {
+                        setSelectedDocs(selectedDocs.map(d => 
+                          d.docType === doc.docType ? { ...d, label: e.target.value } : d
+                        ));
+                      }}
+                      placeholder="Document label"
+                    />
                     <button 
                       type="button"
                       onClick={() => removeDoc(doc.docType)}
@@ -180,9 +193,19 @@ const DocumentSelect = ({ selectedDocs, setSelectedDocs, onBack, onSubmit, isSub
                     </button>
                   </div>
                   
-                  {doc.description && (
-                    <p className="text-xs text-slate-500 mb-2">{doc.description}</p>
-                  )}
+                  <div className="mb-2">
+                    <input 
+                      type="text"
+                      className="text-[11px] text-slate-500 bg-white/50 border-slate-200 rounded px-1.5 py-0.5 w-full focus:bg-white"
+                      placeholder="Add instructions (optional)..."
+                      value={doc.description || ''}
+                      onChange={(e) => {
+                        setSelectedDocs(selectedDocs.map(d => 
+                          d.docType === doc.docType ? { ...d, description: e.target.value } : d
+                        ));
+                      }}
+                    />
+                  </div>
                   
                   <div className="flex items-center gap-2 mt-2 pt-2 border-t border-slate-200/50">
                     <input 

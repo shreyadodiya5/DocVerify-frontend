@@ -1,13 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import Sidebar from '../components/Sidebar';
 import DocumentSelect from './DocumentSelect';
 import { requestService } from '../services/requestService';
+import { userService } from '../services/userService';
+import { useAuth } from '../hooks/useAuth';
+import { isManagerUser } from '../utils/roles';
 import { User, Mail, Phone, FileText } from 'lucide-react';
 import { toast } from 'react-toastify';
 
 const RequestForm = () => {
+  const { user } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
@@ -21,6 +25,30 @@ const RequestForm = () => {
   });
   
   const [selectedDocs, setSelectedDocs] = useState([]);
+
+  useEffect(() => {
+    if (user && !isManagerUser(user)) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [user, navigate]);
+
+  const lookupClientByEmail = async () => {
+    const email = formData.recipientEmail?.trim();
+    if (!email || !email.includes('@')) return;
+    try {
+      const res = await userService.lookupClient(email);
+      if (res.success && res.data) {
+        setFormData((f) => ({
+          ...f,
+          recipientName: f.recipientName?.trim() ? f.recipientName : res.data.name || '',
+          recipientPhone: f.recipientPhone?.trim() ? f.recipientPhone : res.data.phone || '',
+        }));
+        toast.success('Client found — details filled from their account');
+      }
+    } catch {
+      /* optional: invalid client */
+    }
+  };
 
   const handleNext = (e) => {
     e.preventDefault();
@@ -60,7 +88,10 @@ const RequestForm = () => {
         <div className="max-w-4xl mx-auto">
           <div className="mb-8">
             <h1 className="text-2xl font-bold text-slate-900">Create New Request</h1>
-            <p className="text-sm text-slate-500 mt-1">Send a secure magic link for document uploads.</p>
+            <p className="text-sm text-slate-500 mt-1">
+              The recipient must already have a <strong className="font-semibold text-slate-700">Client</strong>{' '}
+              account registered with the same email. They will receive email and SMS with a secure upload link.
+            </p>
           </div>
 
           <div className="mb-8 relative">
@@ -126,7 +157,8 @@ const RequestForm = () => {
                       className="input pl-10"
                       placeholder="john@example.com"
                       value={formData.recipientEmail}
-                      onChange={e => setFormData({...formData, recipientEmail: e.target.value})}
+                      onChange={(e) => setFormData({ ...formData, recipientEmail: e.target.value })}
+                      onBlur={lookupClientByEmail}
                     />
                   </div>
                 </div>

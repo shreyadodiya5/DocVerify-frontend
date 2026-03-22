@@ -13,6 +13,7 @@ export const AuthProvider = ({ children }) => {
     const storedToken = localStorage.getItem('token');
     
     if (storedUser && storedToken) {
+      console.log(`[DIAGNOSTIC] AuthContext: Found stored user ${JSON.parse(storedUser).email}`);
       setUser(JSON.parse(storedUser));
       setToken(storedToken);
     }
@@ -34,9 +35,8 @@ export const AuthProvider = ({ children }) => {
   };
 
   const register = async (userData) => {
+    console.log(`[DIAGNOSTIC] AuthContext: Registering ${userData.email}`);
     const data = await authService.register(userData);
-    setUser(data.data);
-    setToken(data.data.token);
     return data;
   };
 

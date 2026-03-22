@@ -10,7 +10,13 @@ import StatusBadge from './StatusBadge';
 import { formatFileSize } from '../utils/helpers';
 
 const MAX_BYTES = 10 * 1024 * 1024;
-const ACCEPT_TYPES = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
+const ACCEPT_TYPES = [
+  'image/jpeg',
+  'image/png',
+  'image/jpg',
+  'application/pdf',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+];
 
 function truncateFileName(name, max = 30) {
   if (!name || name.length <= max) return name || '';
@@ -108,9 +114,9 @@ const DetailDocumentSlot = ({
     selectedFile?.name ||
     '';
 
-  const isPdf = selectedFile?.type === 'application/pdf';
+  const isImage = selectedFile?.type?.startsWith('image/');
   const previewIcon =
-    selectedFile && !isPdf ? (
+    selectedFile && isImage ? (
       <ImageIcon className="w-5 h-5 text-blue-600" />
     ) : (
       <FileText className="w-5 h-5 text-blue-600" />
@@ -158,7 +164,7 @@ const DetailDocumentSlot = ({
         {showSuccess && (
           <div className="mt-4 flex items-center gap-3 rounded-lg border border-emerald-200 bg-emerald-50/80 px-3 py-2.5">
             <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-            <div className="min-w-0 text-sm">
+            <div className="min-w-0 text-sm flex-1">
               <span className="font-medium text-emerald-800">Uploaded successfully</span>
               {displayName && (
                 <p className="text-emerald-700/90 truncate" title={displayName}>
@@ -166,6 +172,16 @@ const DetailDocumentSlot = ({
                 </p>
               )}
             </div>
+            {serverDoc?.fileUrl && (
+              <a 
+                href={serverDoc.fileUrl} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="btn btn-secondary text-xs py-1 px-2 border-emerald-200 hover:bg-emerald-100/50"
+              >
+                View
+              </a>
+            )}
           </div>
         )}
 
@@ -228,13 +244,13 @@ const DetailDocumentSlot = ({
                   ref={inputRef}
                   type="file"
                   className="hidden"
-                  accept=".pdf,.jpg,.jpeg,.png"
+                  accept=".pdf,.jpg,.jpeg,.png,.docx"
                   onChange={handleInputChange}
                   disabled={disabled}
                 />
                 <UploadCloud className="w-10 h-10 mx-auto text-slate-400 mb-2" />
                 <p className="text-sm font-medium text-slate-700">Click to upload or drag & drop</p>
-                <p className="text-xs text-slate-500 mt-1">PDF, JPG, PNG up to 10MB</p>
+                <p className="text-xs text-slate-500 mt-1">PDF, JPG, PNG, DOCX up to 10MB</p>
               </div>
             )}
 

@@ -3,19 +3,37 @@ import { Link } from 'react-router-dom';
 import { User, Mail, Calendar, ChevronRight } from 'lucide-react';
 import StatusBadge from './StatusBadge';
 import { formatDate } from '../utils/helpers';
+import { useAuth } from '../hooks/useAuth';
+import { isClientUser } from '../utils/roles';
 
 const RequestCard = ({ request }) => {
+  const { user } = useAuth();
+  const incoming = isClientUser(user);
+
+  const borderColor =
+    request.status === 'approved'
+      ? '#10B981'
+      : request.status === 'rejected'
+        ? '#EF4444'
+        : request.status === 'submitted'
+          ? '#3B82F6'
+          : request.status === 'under_review'
+            ? '#F97316'
+            : request.status === 'in_progress'
+              ? '#6366F1'
+              : '#F59E0B';
+
+  const title = incoming
+    ? request.createdBy?.name || 'Manager'
+    : request.recipientName || 'Client';
+
+  const subtitleEmail = incoming ? request.createdBy?.email : request.recipientEmail;
+
   return (
-    <Link 
+    <Link
       to={`/requests/${request._id}`}
       className="card p-5 hover:shadow-lg transition-shadow border-l-4 group block"
-      style={{
-        borderLeftColor: 
-          request.status === 'approved' ? '#10B981' : 
-          request.status === 'rejected' ? '#EF4444' : 
-          request.status === 'submitted' ? '#3B82F6' : 
-          request.status === 'under_review' ? '#F97316' : '#F59E0B'
-      }}
+      style={{ borderLeftColor: borderColor }}
     >
       <div className="flex justify-between items-start mb-4">
         <StatusBadge status={request.status} />
@@ -24,20 +42,23 @@ const RequestCard = ({ request }) => {
           {formatDate(request.createdAt)}
         </span>
       </div>
-      
+
       <div className="space-y-3">
         <h3 className="text-lg font-bold text-slate-800 line-clamp-1 border-b border-slate-100 pb-2">
-          {request.recipientName || 'Unknown Recipient'}
+          {incoming ? 'From: ' : 'To: '}
+          {title}
         </h3>
-        
+
         <div className="space-y-2 text-sm text-slate-600">
-          <div className="flex items-center gap-2">
-            <Mail className="w-4 h-4 text-slate-400 shrink-0" />
-            <span className="truncate">{request.recipientEmail}</span>
-          </div>
+          {subtitleEmail ? (
+            <div className="flex items-center gap-2">
+              <Mail className="w-4 h-4 text-slate-400 shrink-0" />
+              <span className="truncate">{subtitleEmail}</span>
+            </div>
+          ) : null}
           <div className="flex items-center gap-2">
             <User className="w-4 h-4 text-slate-400 shrink-0" />
-            <span>{request.requiredDocuments?.length || 0} Documents Requested</span>
+            <span>{request.requiredDocuments?.length || 0} document(s) in this request</span>
           </div>
         </div>
       </div>

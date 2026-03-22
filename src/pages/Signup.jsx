@@ -13,6 +13,10 @@ const schema = yup.object({
   phone: yup.string()
     .matches(/^\+?[\d\s-]{10,14}$/, 'Must be a valid phone number (min 10 digits)')
     .required('Phone number is required'),
+  accountType: yup
+    .string()
+    .oneOf(['manager', 'client'], 'Choose how you will use DocVerify')
+    .required('Choose account type'),
   password: yup.string().min(6, 'Password must be at least 6 characters').required('Password is required'),
   confirmPassword: yup.string()
     .oneOf([yup.ref('password'), null], 'Passwords must match')
@@ -24,11 +28,14 @@ const Signup = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [isLoading, setIsLoading] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
 
-  const { register, handleSubmit, formState: { errors } } = useForm({
-    resolver: yupResolver(schema)
+  const { register, handleSubmit, watch, formState: { errors } } = useForm({
+    resolver: yupResolver(schema),
+    defaultValues: { accountType: 'client' },
   });
 
+  const accountType = watch('accountType');
   const redirect = searchParams.get('redirect') || '/dashboard';
 
   const onSubmit = async (data) => {
@@ -38,15 +45,39 @@ const Signup = () => {
         name: data.name,
         email: data.email,
         phone: data.phone,
-        password: data.password
+        password: data.password,
+        role: data.accountType,
       });
-      navigate(redirect.startsWith('/') ? redirect : `/${redirect}`);
+      setIsSuccess(true);
+      toast.success('Registration successful! Please check your email.');
     } catch (error) {
       toast.error(error.response?.data?.message || 'Registration failed');
     } finally {
       setIsLoading(false);
     }
   };
+
+  if (isSuccess) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-md w-full mx-auto bg-white p-8 rounded-2xl shadow-xl text-center border border-slate-100">
+          <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Mail className="w-8 h-8 text-primary" />
+          </div>
+          <h2 className="text-2xl font-bold text-slate-900 mb-2">Check your email</h2>
+          <p className="text-slate-600 mb-6">
+            We've sent a verification link to your email address. Please click the link to activate your account.
+          </p>
+          <Link
+            to="/login"
+            className="w-full flex justify-center py-2.5 px-4 rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors"
+          >
+            Go to Login
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
@@ -115,6 +146,48 @@ const Signup = () => {
                 />
               </div>
               {errors.email && <p className="mt-1 text-sm text-error">{errors.email.message}</p>}
+            </div>
+
+            <div>
+              <label className="label">I am signing up as</label>
+              <p className="text-xs text-slate-500 mb-2">
+                Managers send document requests to clients. Clients receive requests and upload files.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <label
+                  className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                    accountType === 'manager'
+                      ? 'border-primary bg-blue-50 ring-1 ring-primary'
+                      : 'border-slate-200 hover:border-slate-300'
+                  }`}
+                >
+                  <input type="radio" value="manager" className="mt-1" {...register('accountType')} />
+                  <span>
+                    <span className="block text-sm font-semibold text-slate-800">Manager / agent</span>
+                    <span className="block text-xs text-slate-500 mt-0.5">
+                      Request documents from clients, review, approve, or ask for changes.
+                    </span>
+                  </span>
+                </label>
+                <label
+                  className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                    accountType === 'client'
+                      ? 'border-primary bg-blue-50 ring-1 ring-primary'
+                      : 'border-slate-200 hover:border-slate-300'
+                  }`}
+                >
+                  <input type="radio" value="client" className="mt-1" {...register('accountType')} />
+                  <span>
+                    <span className="block text-sm font-semibold text-slate-800">Client</span>
+                    <span className="block text-xs text-slate-500 mt-0.5">
+                      Receive requests from managers, upload requested documents, and submit for review.
+                    </span>
+                  </span>
+                </label>
+              </div>
+              {errors.accountType && (
+                <p className="mt-1 text-sm text-error">{errors.accountType.message}</p>
+              )}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">

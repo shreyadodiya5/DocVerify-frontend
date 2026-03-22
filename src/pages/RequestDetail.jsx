@@ -9,6 +9,7 @@ import { requestService } from '../services/requestService';
 import { documentService } from '../services/documentService';
 import { formatDate } from '../utils/helpers';
 import { useAuth } from '../hooks/useAuth';
+import { isManagerUser, isClientUser } from '../utils/roles';
 import { 
   ArrowLeft, 
   User, 
@@ -37,6 +38,7 @@ const RequestDetail = () => {
 
   const [uploadSlots, setUploadSlots] = useState({});
   const [batchSubmitting, setBatchSubmitting] = useState(false);
+  const [finalSubmitting, setFinalSubmitting] = useState(false);
   const activeRequestIdRef = useRef(id);
 
   useEffect(() => {
@@ -148,6 +150,19 @@ const RequestDetail = () => {
     }
   };
 
+  const handleSubmitForReview = async () => {
+    setFinalSubmitting(true);
+    try {
+      await requestService.submitRequestForReview(id);
+      toast.success('Submitted to your manager for review');
+      await fetchDetails({ silent: true });
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Could not submit for review');
+    } finally {
+      setFinalSubmitting(false);
+    }
+  };
+
   const handleSlotUpdate = (docType, patch) => {
     setUploadSlots((prev) => ({
       ...prev,
@@ -223,7 +238,7 @@ const RequestDetail = () => {
     }
 
     if (failures === 0 && successes > 0) {
-      toast.success('Documents submitted successfully!');
+      toast.success('Files uploaded. Review them, then submit to your manager when ready.');
     } else if (failures > 0 && successes === 0) {
       toast.error('Upload failed. Please try again.');
     } else if (failures > 0 && successes > 0) {
@@ -235,10 +250,72 @@ const RequestDetail = () => {
 
   if (!request) return null;
 
-  const isRecipient = user && user.email === request.recipientEmail;
+  const emailMatches = (a, b) =>
+    String(a || '')
+      .toLowerCase()
+      .trim() ===
+    String(b || '')
+      .toLowerCase()
+      .trim();
+
+  const isRecipient = user && emailMatches(user.email, request.recipientEmail);
   const creatorId = request.createdBy?._id ?? request.createdBy;
   const isRequester = user && String(user._id) === String(creatorId);
-  const canUpload = isRecipient || isRequester;
+  const isManagerView = isManagerUser(user) && isRequester;
+  const isClientView = isClientUser(user) && isRecipient;
+  const canUpload = isClientView;
+
+  const requestStatusSubtitle = () => {
+    if (isManagerView) {
+      switch (request.status) {
+        case 'pending':
+          return 'Client has not started uploading yet.';
+        case 'in_progress':
+          return 'Client is uploading files. Approve or reject only after they submit for review.';
+        case 'submitted':
+          return 'Client submitted — review each file, approve, or request changes (email is sent automatically on reject).';
+        case 'under_review':
+          return 'Waiting for the client to fix rejected items and submit again.';
+        case 'approved':
+          return 'Every required document is approved.';
+        case 'rejected':
+          return 'This request was marked rejected.';
+        default:
+          return '';
+      }
+    }
+    if (isClientView) {
+      switch (request.status) {
+        case 'pending':
+          return 'Upload the requested files, then submit to your manager for review.';
+        case 'in_progress':
+          return 'Files are saved on our side. When everything looks correct, submit for review.';
+        case 'submitted':
+          return 'Your manager is reviewing. You will get email/SMS if changes are needed.';
+        case 'under_review':
+          return 'Replace rejected items, then submit again for review.';
+        case 'approved':
+          return 'All required documents are approved.';
+        case 'rejected':
+          return 'This request was rejected.';
+        default:
+          return '';
+      }
+    }
+    return '';
+  };
+
+  const requiredDocsReady = request.requiredDocuments
+    .filter((rd) => rd.isRequired)
+    .every((rd) => {
+      const d = documents.find((x) => x.docType === rd.docType);
+      return d?.fileUrl && d.status !== 'rejected';
+    });
+
+  const canSubmitForReview =
+    isClientView &&
+    requiredDocsReady &&
+    ['pending', 'in_progress', 'under_review'].includes(request.status);
 
   const mergedDocuments = request.requiredDocuments.map(reqDoc => {
     const uploaded = documents.find(d => d.docType === reqDoc.docType);
@@ -279,7 +356,7 @@ const RequestDetail = () => {
                   <h1 className="text-2xl font-bold text-slate-900 line-clamp-1">
                     {request.recipientName}
                   </h1>
-                  <StatusBadge status={request.status} />
+                  <StatusBadge status={request.status} subtitle={requestStatusSubtitle()} />
                 </div>
                 <p className="text-sm text-slate-500 mt-1 flex items-center gap-1.5">
                   <Calendar className="w-4 h-4" />
@@ -288,24 +365,26 @@ const RequestDetail = () => {
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              <button 
-                onClick={handleResend}
-                disabled={resending || request.status === 'approved'}
-                className="btn btn-secondary py-2 px-3 text-sm disabled:opacity-50"
-              >
-                <Send className="w-4 h-4 mr-1.5" />
-                {resending ? 'Sending...' : 'Resend Link'}
-              </button>
-              <button 
-                onClick={handleDelete}
-                disabled={deleting}
-                className="btn btn-danger py-2 px-3 text-sm bg-white text-error border border-error hover:bg-red-50"
-              >
-                <Trash2 className="w-4 h-4 mr-1.5" />
-                Delete
-              </button>
-            </div>
+            {isManagerView ? (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleResend}
+                  disabled={resending || request.status === 'approved'}
+                  className="btn btn-secondary py-2 px-3 text-sm disabled:opacity-50"
+                >
+                  <Send className="w-4 h-4 mr-1.5" />
+                  {resending ? 'Sending...' : 'Resend Link'}
+                </button>
+                <button
+                  onClick={handleDelete}
+                  disabled={deleting}
+                  className="btn btn-danger py-2 px-3 text-sm bg-white text-error border border-error hover:bg-red-50"
+                >
+                  <Trash2 className="w-4 h-4 mr-1.5" />
+                  Delete
+                </button>
+              </div>
+            ) : null}
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -314,7 +393,7 @@ const RequestDetail = () => {
               <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
                 <div className="flex justify-between items-end mb-2">
                   <span className="text-sm font-semibold text-slate-700">
-                    {isRecipient ? 'Upload Progress' : 'Verification Progress'}
+                    {isClientView ? 'Your upload progress' : 'Verification progress'}
                   </span>
                   <span className="text-sm font-bold text-blue-600">
                     {`${submittedDocsCount} / ${totalDocs}`}
@@ -335,9 +414,9 @@ const RequestDetail = () => {
 
               <div className="space-y-4">
                 <h3 className="text-lg font-bold text-slate-800">
-                  {isRecipient ? 'Upload Required Documents' : 'Requested Documents'}
+                  {isClientView ? 'Your uploads (requested items only)' : 'Requested documents'}
                 </h3>
-                
+
                 {mergedDocuments.map((doc) => {
                   const needsUpload = !doc.fileUrl || doc.status === 'rejected';
 
@@ -361,19 +440,35 @@ const RequestDetail = () => {
                     );
                   }
 
-                  if (!needsUpload && isRequester) {
+                  if (needsUpload && isManagerView) {
+                    return (
+                      <div
+                        key={doc.docType}
+                        className="bg-white rounded-xl border border-dashed border-slate-300 p-5 text-slate-600"
+                      >
+                        <h4 className="font-semibold text-slate-800">{doc.label}</h4>
+                        <p className="text-sm mt-1">
+                          Waiting for the client to upload this document. You cannot upload on their
+                          behalf.
+                        </p>
+                      </div>
+                    );
+                  }
+
+                  if (!needsUpload && isManagerView) {
                     return (
                       <DocumentCard
                         key={doc._id}
                         document={doc}
                         isRequester={true}
+                        canReviewDocuments={['submitted', 'in_progress', 'under_review'].includes(request.status)}
                         onVerify={handleVerifyDoc}
                         onReject={handleRejectDoc}
                       />
                     );
                   }
 
-                  if (!needsUpload && isRecipient) {
+                  if (!needsUpload && isClientView) {
                     return (
                       <DetailDocumentSlot
                         key={doc.docType}
@@ -394,14 +489,15 @@ const RequestDetail = () => {
                       key={doc._id}
                       document={doc}
                       isRequester={false}
+                      canReviewDocuments={false}
                       onVerify={handleVerifyDoc}
                       onReject={handleRejectDoc}
                     />
                   );
                 })}
 
-                {canUpload && mergedDocuments.length > 0 && (
-                  <div className="pt-2 space-y-2">
+                {isClientView && mergedDocuments.length > 0 && (
+                  <div className="pt-2 space-y-3">
                     {anyNeedsUpload ? (
                       <>
                         <button
@@ -417,39 +513,75 @@ const RequestDetail = () => {
                           {batchSubmitting ? (
                             <>
                               <Loader2 className="w-5 h-5 animate-spin" />
-                              Submitting...
+                              Uploading…
                             </>
                           ) : (
                             <>
                               <Send className="w-5 h-5" />
-                              Submit All Documents
+                              Upload selected files
                             </>
                           )}
                         </button>
                         {selectedCount === needUploadDocs.length &&
                           needUploadDocs.length > 0 && (
                             <p className="text-sm text-center text-green-600">
-                              ✓ All documents ready to submit
+                              ✓ All required slots have a file selected
                             </p>
                           )}
                         {selectedCount > 0 &&
                           selectedCount < needUploadDocs.length && (
                             <p className="text-sm text-center text-amber-600">
-                              ⚠ {selectedCount} of {needUploadDocs.length}{' '}
-                              documents selected — you can still submit partial
+                              ⚠ {selectedCount} of {needUploadDocs.length} selected — partial upload
+                              is allowed
                             </p>
                           )}
                       </>
-                    ) : (
+                    ) : null}
+
+                    {request.status === 'submitted' && isClientView ? (
+                      <p className="text-sm text-center text-slate-600 bg-slate-50 border border-slate-200 rounded-lg py-3 px-4">
+                        This request is with your manager for review. You will be notified by email if
+                        anything needs to be redone.
+                      </p>
+                    ) : null}
+
+                    {canSubmitForReview ? (
                       <button
                         type="button"
-                        disabled
-                        className="w-full flex items-center justify-center gap-2 rounded-xl py-3 font-semibold bg-green-600 text-white cursor-not-allowed opacity-95"
+                        onClick={handleSubmitForReview}
+                        disabled={finalSubmitting}
+                        className="w-full flex items-center justify-center gap-2 rounded-xl py-3 text-white font-semibold bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60"
                       >
-                        <CheckCircle2 className="w-5 h-5" />
-                        All Submitted
+                        {finalSubmitting ? (
+                          <>
+                            <Loader2 className="w-5 h-5 animate-spin" />
+                            Submitting…
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle2 className="w-5 h-5" />
+                            Submit to manager for review
+                          </>
+                        )}
                       </button>
-                    )}
+                    ) : null}
+
+                    {!anyNeedsUpload &&
+                    isClientView &&
+                    ['pending', 'in_progress', 'under_review'].includes(request.status) &&
+                    !canSubmitForReview ? (
+                      <p className="text-sm text-center text-amber-700 bg-amber-50 border border-amber-100 rounded-lg py-2 px-3">
+                        Upload every <strong className="font-semibold">required</strong> document (and
+                        fix any rejected items) before you can submit for review.
+                      </p>
+                    ) : null}
+
+                    {!anyNeedsUpload && isClientView && request.status === 'approved' ? (
+                      <div className="w-full flex items-center justify-center gap-2 rounded-xl py-3 font-semibold bg-green-600 text-white">
+                        <CheckCircle2 className="w-5 h-5" />
+                        Fully approved
+                      </div>
+                    ) : null}
                   </div>
                 )}
               </div>
@@ -460,28 +592,53 @@ const RequestDetail = () => {
               
               <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
                 <h3 className="text-base font-bold text-slate-800 mb-4 border-b border-slate-100 pb-2">
-                  Recipient Details
+                  {isClientView ? 'Request from' : 'Recipient details'}
                 </h3>
-                
+
                 <div className="space-y-4">
+                  {isClientView ? (
+                    <>
+                      <div className="flex items-start gap-3">
+                        <User className="w-5 h-5 text-slate-400 shrink-0 mt-0.5" />
+                        <div>
+                          <span className="text-xs text-slate-500 block mb-0.5">Manager</span>
+                          <span className="text-sm font-medium text-slate-900">
+                            {request.createdBy?.name || '—'}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <Mail className="w-5 h-5 text-slate-400 shrink-0 mt-0.5" />
+                        <div className="min-w-0">
+                          <span className="text-xs text-slate-500 block mb-0.5">Manager email</span>
+                          <span className="text-sm font-medium text-slate-900 truncate block">
+                            {request.createdBy?.email || '—'}
+                          </span>
+                        </div>
+                      </div>
+                    </>
+                  ) : null}
+
                   <div className="flex items-start gap-3">
                     <User className="w-5 h-5 text-slate-400 shrink-0 mt-0.5" />
                     <div>
-                      <span className="text-xs text-slate-500 block mb-0.5">Full Name</span>
+                      <span className="text-xs text-slate-500 block mb-0.5">Client name</span>
                       <span className="text-sm font-medium text-slate-900">{request.recipientName}</span>
                     </div>
                   </div>
                   <div className="flex items-start gap-3">
                     <Mail className="w-5 h-5 text-slate-400 shrink-0 mt-0.5" />
                     <div className="min-w-0">
-                      <span className="text-xs text-slate-500 block mb-0.5">Email</span>
-                      <span className="text-sm font-medium text-slate-900 truncate block">{request.recipientEmail}</span>
+                      <span className="text-xs text-slate-500 block mb-0.5">Client email</span>
+                      <span className="text-sm font-medium text-slate-900 truncate block">
+                        {request.recipientEmail}
+                      </span>
                     </div>
                   </div>
                   <div className="flex items-start gap-3">
                     <Phone className="w-5 h-5 text-slate-400 shrink-0 mt-0.5" />
                     <div>
-                      <span className="text-xs text-slate-500 block mb-0.5">Phone</span>
+                      <span className="text-xs text-slate-500 block mb-0.5">Client phone</span>
                       <span className="text-sm font-medium text-slate-900">{request.recipientPhone}</span>
                     </div>
                   </div>

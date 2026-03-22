@@ -7,8 +7,11 @@ import Loader from '../components/Loader';
 import { requestService } from '../services/requestService';
 import { FilePlus, Search, Filter, RefreshCw } from 'lucide-react';
 import { toast } from 'react-toastify';
+import { useAuth } from '../hooks/useAuth';
+import { isManagerUser, isClientUser } from '../utils/roles';
 
 const Dashboard = () => {
+  const { user } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -33,18 +36,28 @@ const Dashboard = () => {
 
   const stats = {
     total: requests.length,
-    pending: requests.filter(r => r.status === 'pending').length,
-    submitted: requests.filter(r => r.status === 'submitted').length,
-    underReview: requests.filter(r => r.status === 'under_review').length,
-    approved: requests.filter(r => r.status === 'approved').length,
-    rejected: requests.filter(r => r.status === 'rejected').length,
+    pending: requests.filter((r) => r.status === 'pending').length,
+    inProgress: requests.filter((r) => r.status === 'in_progress').length,
+    submitted: requests.filter((r) => r.status === 'submitted').length,
+    underReview: requests.filter((r) => r.status === 'under_review').length,
+    approved: requests.filter((r) => r.status === 'approved').length,
+    rejected: requests.filter((r) => r.status === 'rejected').length,
   };
+
+  const manager = isManagerUser(user);
+  const client = isClientUser(user);
+  const needsClientAction = stats.pending + stats.inProgress + stats.underReview;
 
   const filteredRequests = requests.filter(req => {
     if (filter !== 'all' && req.status !== filter) return false;
     
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
+      const managerName = req.createdBy?.name?.toLowerCase() || '';
+      const managerEmail = req.createdBy?.email?.toLowerCase() || '';
+      if (client) {
+        return managerName.includes(query) || managerEmail.includes(query);
+      }
       return (
         req.recipientName?.toLowerCase().includes(query) ||
         req.recipientEmail?.toLowerCase().includes(query)
@@ -65,44 +78,62 @@ const Dashboard = () => {
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
           <div>
             <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
-            <p className="text-sm text-slate-500 mt-1">Manage all your document requests</p>
+            <p className="text-sm text-slate-500 mt-1">
+              {manager && 'Outgoing requests to your clients'}
+              {client && 'Document requests sent to you'}
+              {!manager && !client && 'Your document activity'}
+            </p>
           </div>
           <div className="flex items-center gap-3 w-full sm:w-auto">
-            <button 
-              onClick={fetchRequests} 
+            <button
+              onClick={fetchRequests}
               className="p-2 text-slate-500 hover:text-primary hover:bg-blue-50 rounded-lg transition-colors border border-slate-200 bg-white"
               title="Refresh request list"
             >
               <RefreshCw className="w-5 h-5" />
             </button>
-            <Link to="/requests/new" className="btn btn-primary w-full sm:w-auto">
-              <FilePlus className="w-4 h-4 mr-2" />
-              New Request
-            </Link>
+            {manager ? (
+              <Link to="/requests/new" className="btn btn-primary w-full sm:w-auto">
+                <FilePlus className="w-4 h-4 mr-2" />
+                New Request
+              </Link>
+            ) : null}
           </div>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           <div className="card p-4 border-l-4 border-slate-400">
-            <span className="text-sm font-medium text-slate-500">Total Requests</span>
+            <span className="text-sm font-medium text-slate-500">Total</span>
             <div className="mt-2 flex items-baseline gap-2">
               <span className="text-2xl font-bold text-slate-800">{stats.total}</span>
             </div>
           </div>
           <div className="card p-4 border-l-4 border-warning">
-            <span className="text-sm font-medium text-slate-500">Pending Docs</span>
+            <span className="text-sm font-medium text-slate-500">
+              {manager ? 'Awaiting client' : 'Your action'}
+            </span>
             <div className="mt-2 flex items-baseline gap-2">
-              <span className="text-2xl font-bold text-warning">{stats.pending}</span>
+              <span className="text-2xl font-bold text-warning">
+                {manager ? stats.pending + stats.inProgress : needsClientAction}
+              </span>
             </div>
+            <p className="text-[10px] text-slate-400 mt-1 leading-snug">
+              {manager ? 'Not submitted for your review yet' : 'Upload or fix rejected items'}
+            </p>
           </div>
           <div className="card p-4 border-l-4 border-secondary">
-            <span className="text-sm font-medium text-slate-500">Awaiting Review</span>
+            <span className="text-sm font-medium text-slate-500">
+              {manager ? 'Ready for review' : 'With manager'}
+            </span>
             <div className="mt-2 flex items-baseline gap-2">
               <span className="text-2xl font-bold text-secondary">{stats.submitted}</span>
             </div>
+            <p className="text-[10px] text-slate-400 mt-1 leading-snug">
+              {manager ? 'Client submitted for approval' : 'Waiting on manager'}
+            </p>
           </div>
           <div className="card p-4 border-l-4 border-success">
-            <span className="text-sm font-medium text-slate-500">Fully Approved</span>
+            <span className="text-sm font-medium text-slate-500">Approved</span>
             <div className="mt-2 flex items-baseline gap-2">
               <span className="text-2xl font-bold text-success">{stats.approved}</span>
             </div>
@@ -111,17 +142,34 @@ const Dashboard = () => {
 
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm mb-6 flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
           <div className="flex flex-wrap items-center gap-2 overflow-x-auto w-full no-scrollbar pb-1">
-            {['all', 'pending', 'submitted', 'under_review', 'approved', 'rejected'].map(f => (
+            {[
+              'all',
+              'pending',
+              'in_progress',
+              'submitted',
+              'under_review',
+              'approved',
+              'rejected',
+            ].map((f) => (
               <button
                 key={f}
                 onClick={() => setFilter(f)}
                 className={`px-3 py-1.5 text-sm font-medium rounded-full whitespace-nowrap transition-colors ${
-                  filter === f 
-                    ? 'bg-primary text-white' 
+                  filter === f
+                    ? 'bg-primary text-white'
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                 }`}
               >
-                {f.replace('_', ' ').charAt(0).toUpperCase() + f.replace('_', ' ').slice(1)} ({f === 'all' ? stats.total : stats[f === 'under_review' ? 'underReview' : f] || 0})
+                {f === 'in_progress'
+                  ? 'In progress'
+                  : f.replace('_', ' ').charAt(0).toUpperCase() + f.replace('_', ' ').slice(1)}{' '}
+                (
+                {f === 'all'
+                  ? stats.total
+                  : stats[
+                      f === 'under_review' ? 'underReview' : f === 'in_progress' ? 'inProgress' : f
+                    ] || 0}
+                )
               </button>
             ))}
           </div>
@@ -133,7 +181,9 @@ const Dashboard = () => {
             <input
               type="text"
               className="input pl-10 text-sm py-2"
-              placeholder="Search by name or email..."
+              placeholder={
+                client ? 'Search by manager name or email…' : 'Search by client name or email…'
+              }
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -165,9 +215,13 @@ const Dashboard = () => {
                 Clear Filters
               </button>
             ) : (
-              <Link to="/requests/new" className="btn btn-primary">
-                Create First Request
-              </Link>
+              manager ? (
+                <Link to="/requests/new" className="btn btn-primary">
+                  Create First Request
+                </Link>
+              ) : (
+                <p className="text-sm text-slate-500">When a manager sends you a request, it will show up here.</p>
+              )
             )}
           </div>
         )}

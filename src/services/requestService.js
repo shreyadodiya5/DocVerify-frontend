@@ -35,6 +35,11 @@ const resendNotification = async (id) => {
   return response.data;
 };
 
+const submitRequestForReview = async (id) => {
+  const response = await api.post(`/requests/${id}/submit`);
+  return response.data;
+};
+
 export const requestService = {
   createRequest,
   getRequests,
@@ -43,4 +48,5 @@ export const requestService = {
   deleteRequest,
   verifyAccessToken,
   resendNotification,
+  submitRequestForReview,
 };

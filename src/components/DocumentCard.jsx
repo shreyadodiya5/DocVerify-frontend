@@ -10,11 +10,12 @@ import {
 import StatusBadge from './StatusBadge';
 import { formatDate, formatFileSize } from '../utils/helpers';
 
-const DocumentCard = ({ 
-  document, 
-  onVerify, 
-  onReject, 
-  isRequester 
+const DocumentCard = ({
+  document,
+  onVerify,
+  onReject,
+  isRequester,
+  canReviewDocuments = false,
 }) => {
   const [remarks, setRemarks] = useState(document.remarks || '');
   const [showRejectBox, setShowRejectBox] = useState(false);
@@ -83,7 +84,7 @@ const DocumentCard = ({
             </a>
             
             {/* Action buttons for Person A */}
-            {isRequester && isUploaded && (
+            {isRequester && isUploaded && canReviewDocuments && (
               <div className="flex gap-2 ml-auto">
                 <button 
                   onClick={() => setShowRejectBox(!showRejectBox)}

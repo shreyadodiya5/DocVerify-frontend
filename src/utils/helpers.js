@@ -26,6 +26,8 @@ export const getStatusColor = (status) => {
     case 'submitted':
     case 'uploaded':
       return 'bg-secondary text-white';
+    case 'in_progress':
+      return 'bg-indigo-500 text-white';
     case 'under_review':
       return 'bg-orange-500 text-white';
     default:

@@ -22,7 +22,13 @@ const publicClient = axios.create({
 });
 
 const MAX_BYTES = 10 * 1024 * 1024;
-const ACCEPT_TYPES = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
+const ACCEPT_TYPES = [
+  'image/jpeg',
+  'image/png',
+  'image/jpg',
+  'application/pdf',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+];
 
 function truncateName(name, max = 35) {
   if (!name || name.length <= max) return name || '';
@@ -137,7 +143,7 @@ export default function UploadPage() {
 
   const validateFile = (file) => {
     if (!ACCEPT_TYPES.includes(file.type)) {
-      return 'Please upload a PDF, JPG, or PNG file only.';
+      return 'Please upload a PDF, JPG, PNG, or DOCX file only.';
     }
     if (file.size > MAX_BYTES) {
       return 'File too large. Maximum 10MB allowed.';
@@ -415,6 +421,17 @@ export default function UploadPage() {
                       <p className="text-xs text-emerald-800/90 truncate" title={srv.fileName}>
                         {truncateName(srv.fileName || 'Document', 40)}
                       </p>
+                      {srv.fileUrl && (
+                        <a 
+                          href={srv.fileUrl} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="mt-1 text-xs font-semibold text-emerald-700 hover:text-emerald-900 flex items-center gap-1"
+                        >
+                          <Info className="w-3 h-3" />
+                          View Uploaded File
+                        </a>
+                      )}
                     </div>
                   </div>
                 ) : !showPreview ? (
@@ -442,7 +459,7 @@ export default function UploadPage() {
                         id={inputId}
                         type="file"
                         className="hidden"
-                        accept=".pdf,.jpg,.jpeg,.png"
+                        accept=".pdf,.jpg,.jpeg,.png,.docx"
                         disabled={submitting}
                         onChange={(e) => {
                           const f = e.target.files?.[0];
@@ -455,7 +472,7 @@ export default function UploadPage() {
                         Click to upload or drag & drop
                       </span>
                       <span className="text-xs text-slate-500 mt-1">
-                        PDF, JPG, PNG — Max 10MB
+                        PDF, JPG, PNG, DOCX — Max 10MB
                       </span>
                     </label>
                     {slot.validationError ? (
@@ -472,10 +489,10 @@ export default function UploadPage() {
                 ) : (
                   <>
                     <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50/90 px-4 py-3">
-                      {slot.file?.type === 'application/pdf' ? (
-                        <FileText className="w-6 h-6 shrink-0 text-emerald-700" />
-                      ) : (
+                      {slot.file?.type?.startsWith('image/') ? (
                         <ImageIcon className="w-6 h-6 shrink-0 text-emerald-700" />
+                      ) : (
+                        <FileText className="w-6 h-6 shrink-0 text-emerald-700" />
                       )}
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium text-slate-900 truncate" title={slot.file?.name}>

@@ -11,6 +11,7 @@ import FAQ from './pages/FAQ';
 // Auth Pages
 import Login from './pages/Login';
 import Signup from './pages/Signup';
+import VerifyEmail from './pages/VerifyEmail';
 
 // Protected Pages
 import Dashboard from './pages/Dashboard';
@@ -51,13 +52,13 @@ const App = () => {
           </ProtectedRoute>
         } 
       />
-      <Route 
-        path="/requests/new" 
+      <Route
+        path="/requests/new"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute managerOnly>
             <RequestForm />
           </ProtectedRoute>
-        } 
+        }
       />
       <Route 
         path="/requests/:id" 
@@ -70,6 +71,7 @@ const App = () => {
 
       {/* Public — no auth; Person B uses magic link from email/SMS */}
       <Route path="/upload/:token" element={<UploadPage />} />
+      <Route path="/verify-email/:token" element={<VerifyEmail />} />
 
       {/* Fallback Route */}
       <Route path="*" element={<Navigate to="/" replace />} />
