@@ -41,15 +41,15 @@ const Footer = () => {
             <ul className="space-y-3 text-sm">
               <li className="flex items-start gap-3">
                 <Mail className="w-5 h-5 text-accent shrink-0" />
-                <span>support@docverify.com</span>
+                <span>shreyadodiya5@gmail.com</span>
               </li>
               <li className="flex items-start gap-3">
                 <Phone className="w-5 h-5 text-accent shrink-0" />
-                <span>+91 98765 43210</span>
+                <span>+91 9979656424</span>
               </li>
               <li className="flex items-start gap-3">
                 <MapPin className="w-5 h-5 text-accent shrink-0" />
-                <span>123 Tech Park, Bangalore, India</span>
+                <span>Anand , Gujarat</span>
               </li>
             </ul>
           </div>
